@@ -1,36 +1,27 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense} from "react";
 import { lazy } from "react";
 import Error from "./Error.jsx";
 import { sortPlacesByDistance } from "../loc.js";
 import { fetchAvailablePlaces } from "../http.js";
+import useFecth from "../hooks/useFecth.js";
 
 const Places = lazy(() => import("./Places.jsx"));
 
-export default function AvailablePlaces({ onSelectPlace }) {
-  const [places, setPlaces] = useState([]);
-  const [error, setError] = useState(false);
+async function fetchSortedPlaces() {
+  const places = await fetchAvailablePlaces();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const AvailablePlaces = await fetchAvailablePlaces();
-        navigator.geolocation.getCurrentPosition(({ coords }) => {
-          const sortedPlaces = sortPlacesByDistance(
-            AvailablePlaces,
-            coords.latitude,
-            coords.longitude
-          );
-          setPlaces(sortedPlaces);
-        });
-      } catch (err) {
-        setError({
-          message: err.message || "can't fetch places, try again later",
-        });
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: { latitude, longitude } }) => {
+        const sortedPlaces = sortPlacesByDistance(places, latitude, longitude);
+        resolve(sortedPlaces);
       }
-    };
+    );
+  });
+}
 
-    fetchData();
-  }, []);
+export default function AvailablePlaces({ onSelectPlace }) {
+  const { error, data: places } = useFecth(fetchSortedPlaces, []);
 
   if (error) {
     return (
@@ -43,7 +34,7 @@ export default function AvailablePlaces({ onSelectPlace }) {
   }
 
   return (
-    <Suspense fallback={<p>Loading</p>}>
+    <Suspense fallback={<p>...Loading</p>}>
       <Places
         title="Available Places"
         places={places}
